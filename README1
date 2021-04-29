@@ -1,0 +1,119 @@
+Reconstructing & Flash
+    Split app.js into different files
+    1. Breaking out Campground routes
+        1. Create router folder and create different modules
+        2. In each js file, import router 
+        3. Import the module in the app.js, and app.use the module
+        4. Move everything related to the campground to campground.js
+    2. Repeat for Review 
+        !!! Get inherited for the functions from the app.js
+        In default, we cannot get the campground id in review,
+        
+        const router = express.Router({mergeParams: true});
+    3. Serving static assets
+        1. Create public folder to place commen used assets.
+        2. Apply in the app.js 
+            app.use(express.static('public'))
+        3. Move the script from boilerplate.ejs to the public  
+            app.use(express.static(path.join(__dirname), 'public'))
+    4. configuring Express Session 
+        1. Install Express-Session
+        2. Require it and use it with session Config. 
+            const sessionConfig = {
+                secret: 'thisshouldbeabetterscret!',
+                resave: false,
+                saveUninitialized: true,
+                cookie: {
+                    httpOnly: true
+                    expires: Date.now() + 1000 * 60 * 60 * 24 * 7, -> Set the max duration a user can stay to be 7 days.
+                    maxAge: 1000 * 60 * 60 * 24 * 7,
+                }
+            }
+        3. 
+    5. Set up Flash - 成功提醒
+        三个部分 - flash.ejs, app.js, review.js, campgrounds.js
+        app.js 起到连接作用
+
+        1. Install and require and use - flash-connect
+        2. We can use the flash while user successfully creates a new campground
+            req.flash('success', 'Successfully made a new campground!')
+            req.flash('signal', 'msg')
+            传出一个success的信号，信号里包含了后面的信息。
+        3. Create a middleware in app.js
+            On every single request, we are going to take every flash that has success and have access to it.
+            这样的话，就不需要一个一个的去传'success'
+            app.use((req, res, next) => {
+                res.locals.success = req.flash('success'); -> 连接signal信号
+                next();
+            })
+        4. Repeat for the error
+            res.locals.error = req.flash('error');
+            if(!campground) {
+                req.flash('error', 'Cannot find the campground!');
+                return res.redirect('/campgrounds');
+            }
+
+
+    6. Flash success partials
+        1. partial folder 是为了加入小部件 
+        2. Create a flash.ejs and use it in the boilerplate.ejs
+        3. When there is a success signal, show the message 
+        4. Add req.flash('', '') to wherever needs it.
+
+Adding in Authentication 
+    Install passport passport-local passport-local-mongoose
+    1. Create user model 
+        1.1 Import Mongoose, and passport-local-mongoose
+        1.2 plugin the passport-local-mongoose
+        1.3 Export the model
+    2. Config Passport 
+        2.1 Require passport and passport=local 
+        2.2 Use 
+            app.use(passport.initialize());
+            app.use(passport.session()); -> persistent login, after session()
+        2.3 Use the authenicate from User model 
+            passport.use(new LocalStrategy(User.authenticate()));
+        2.4 serializeUser and deserilizeUser
+    3. Register
+        3.1 Create the 'user.js' , and register.ejs 
+        3.2 Use the route in the app.js 
+        3.3 Use get to the form and post to update the DB 
+        3.4 Add try-catch to 'success' or 'error'. 
+
+    4. Login 
+        4.1 Add new get, and post in users.js 
+            passport.authenticate('local', {failureFlash: true, failureRedirect: '/login'}
+        4.2 Add login.ejs in users folder
+
+    5. isLoggedin middleware
+        Place this middleware in places where logged in is required
+        1. use isAuthendicated() from Passport
+        2. When to use: Create or update campground or review
+            !!! When export a function from a js file   
+                module.exports.isLoggedin = ....
+        3. Create the middlewares.js file to place middleware
+
+    6. Log out
+    7. currentUser Helper 
+        1. Add conditions to show the login/logout
+        2. Use req.user to check whether now is logged in or not 
+        3. and res.locals.currentUser = req.user -> globalize the req.user
+    8. Register refinement 
+        When a user registers, we log the user in 
+                req.login(registeredUser, err => {
+                    if(err) {
+                        return next(err);
+                    } else {
+                        req.flash('success', 'Welcome to Yelp Camp!');
+                        res.redirect('/campgrounds');
+                    }
+                })
+    9. Return To Behavoir 
+        After login, redirect to where user was trying to go before loging in.
+        1. Store the url they are requesting. 
+            Save it into the session 
+            -> req.session.returnTo = req.originalUrl
+        2. in the post route of login, redirect to the url
+                const redirectUrl = req.session.returnTo || '/campgrounds';
+                delete req.session.returnTo;
+                res.redirect(redirectUrl);

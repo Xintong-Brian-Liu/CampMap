@@ -1,0 +1,132 @@
+Basic Authorization 
+    加入所有人，链接post和user
+    Use populate 我们传入userid，然后它会通过ref去识别
+    1. Adding an author to campground
+        When creating a new campground, take the userId that is stored in the request
+        1.1 updating the campground model 
+        1.2 Update campground.author to the the user id
+    2. Show and hiding edit/delete
+        Deal the client-side of deletion 
+    3. Campground permissions 
+        Deal with Server-side deletion 
+        防止别人通过postman去修改其他人的post
+        1. Create a middleware to check whether the author and current user have the same id.
+
+    4. More review authorization 
+        1. 显示review 的author
+            Use nested populate - campground.js
+                const campground = await Campground.findById(id).populate({
+                    path: 'review',
+                    populate: {
+                        path: 'author'
+                    }
+                }).populate('author');
+        2. 需要登陆并且是主人才能删除review
+            client-side: hide the delete button
+            server-side: Create a middleware to check the user._id
+
+Refactory 
+    MVC(model, view, contoller)
+    1. Campground route controler 
+        1. Create a controller folder and create a campground file 
+        2. Move the functions in route-campgrounds to the controller files
+        3. Export the functions and import in route files.
+        Same to user, and review 
+    2. A fancy way to Reconstructing routes
+        Chain the request with same routes
+        router.route()
+    3. Displaying star ratings
+        Starability 
+
+Adding Map 
+    install mapbox sdk
+    1.Geocoding our location  
+        When creating a new camp，搜索关键词，然后他会转化成geographc coordinates
+        In controler-campground.js
+        ！！！当需要使用api中的某个数据时，print出来然后去里面找
+            const mbxGeocoding = require("@mapbox/mapbox-sdk/services/geocoding");
+            const mapBoxToken = 'pk.eyJ1IjoiYnJpYW45NjQ4IiwiYSI6ImNrbzIycnp1YzBlYXkyb292dzM4ZjI0NHoifQ.L3O3bPLSNOKwfp1uDYmAWw ';
+            const geocoder = mbxGeocoding({ accessToken: mapBoxToken });
+            const geoData = await geocoder.forwardGeocode({
+                query: req.body.campground.location,
+                limit: 1
+            }).send()
+
+    2. Working with GeoJSON
+        Store the geodata into the model
+        1. geodate returns a GeoJSON format. 
+            Modify the model 
+                geometry: {
+                    type: {
+                        type: String,
+                        enum: ['Point'],
+                        required: true
+                    },
+                    coordinates: {
+                        type: [Number],
+                        required: true
+                    }
+                }
+            Use it in controller
+                campground.geometry = geoData.body.features[0].geometry;
+    3. Displaying the map 
+        MapBox GL JS -> Read the doc to install
+    4. Centering the map on a campground
+    In the showPageMap.js, we can focus the map based on the long and lat
+        new mapboxgl.Marker()
+            .setLngLat(campground.geometry.coordinates)
+            .setPopup(
+                new mapboxgl.Popup({ offset: 25 })
+                    .setHTML(
+                        `<h3>${campground.title}</h3><p>${campground.location}</p>`
+                    )
+            )
+            .addTo(map)
+
+    5. Adjust the seeds file
+
+Fancy Cluster Map
+    Show the map in the index.ejs
+    1. Adding earthquake cluster map
+        1. Create a public javascript call clusterMap.js
+        2. Import the map from MapBox
+    2. Basic Clustering campgrounds
+        1. Modify the clusterMap to be connected with index.ejs
+            map.addSource('campground', {...}) -> campground here is to pass the data to addLayer
+        2. Pass in the data from index.ejs
+                const mapToken = '<%-process.env.MAPBOX_TOKEN%>';
+                const campgrounds = { features: <%- JSON.stringify(campgrounds) %>}
+        3. Customize the map 
+            1. When do we want them to cluster, when to shrink - clusterMap.js
+                'circle-color': [
+                    'step',
+                    ['get', 'point_count'],
+                    '#00BCD4',
+                    10,
+                    '#2196F3',
+                    30,
+                    '#3F51B5'
+                ],
+                'circle-radius': [
+                    'step',
+                    ['get', 'point_count'],
+                    15, // Width
+                    10, // steps, below 10 is 15px
+                    20,
+                    30, // 10 - 30, 20 px
+                    25  // 30 above , 25
+                ]
+    3. Adding Custom Popups
+        What to show when click the bubble. 
+        1. The MapBox is looking for 'property', so we need to create a virtual format
+           
+            CampgroundSchema.virtual('properties.popUpMarkup').get(function () {
+                return `
+                <strong><a href="/campgrounds/${this._id}">${this.title}</a><strong>
+                <p>${this.description.substring(0, 20)}...</p>`
+            });
+
+            Pass in what is returned into the propertyies.popUpMarkup
+
+            !!! By default, Monggose does not include virtural when you convert a document to JSON
+                const opts = { toJSON: { virtuals: true } }; // Allow Mongoose to use JSON in virtual

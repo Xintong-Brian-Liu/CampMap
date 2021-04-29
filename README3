@@ -1,0 +1,8 @@
+What is Population ??
+    Population is way of automatically replacing a path in document 
+    with actual documents from other collections. 
+    E.g. Replace the user id in a document with 
+    the data of that user. Mongoose has an awesome 
+    method 'populate' to help us. 
+    We define 'refs' in ours schema and mongoose uses 
+    those 'refs' to look for documents in other collection.
